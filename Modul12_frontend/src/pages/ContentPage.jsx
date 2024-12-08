@@ -6,14 +6,13 @@ import {
     Spinner, 
     Alert, 
 } from "react-bootstrap"; 
-     
-// import { useMutation } from "@tanstack/react-query"; 
+
 import { FaTrash } from "react-icons/fa"; 
 import { toast } from "react-toastify"; 
-    
+
 import ModalCreateContent from "../components/modals/ModalCreateContent"; 
 import ModalEditContent from "../components/modals/ModalEditContent"; 
-    
+
 import { GetMyContents, DeleteContent } from "../api/apiContent"; 
 import { useEffect, useState } from "react"; 
 import { getThumbnail } from "../api"; 
@@ -21,43 +20,59 @@ import { getThumbnail } from "../api";
 const ContentPage = () => { 
     const [isLoading, setIsLoading] = useState(false); 
     const [contents, setContents] = useState([]); 
-    const [isPending, setIsPending] = useState(false); 
+    const [pendingDeletes, setPendingDeletes] = useState([]); 
+    const [showCreateModal, setShowCreateModal] = useState(false); 
 
-    const deleteContent = (id) => { 
-        setIsPending(true); 
-        DeleteContent(id).then((response) => { 
-            setIsPending(false); 
-            toast.success(response.message); 
-            fetchContents(); 
-        }).catch((err) => { 
-            console.log(err); 
-            setIsPending(false); 
-            toast.dark(err.message); 
-        }) 
-    } 
- 
     const fetchContents = () => { 
         setIsLoading(true); 
-        GetMyContents().then((response) => { 
-            setContents(response); 
-            setIsLoading(false); 
-        }).catch((err) => { 
-            console.log(err); 
-            setIsLoading(false); 
-        }) 
-    } 
- 
+        GetMyContents()
+            .then((response) => { 
+                setContents(response); 
+                setIsLoading(false); 
+            })
+            .catch((err) => { 
+                console.log(err); 
+                setIsLoading(false); 
+                toast.error("Terjadi kesalahan saat memuat data."); 
+            }); 
+    }; 
+
+    const deleteContent = (id) => { 
+        setPendingDeletes((prev) => [...prev, id]); 
+        DeleteContent(id)
+            .then((response) => { 
+                setPendingDeletes((prev) => prev.filter((deleteId) => deleteId !== id)); 
+                toast.success(response.message); 
+                fetchContents(); 
+            })
+            .catch((err) => { 
+                console.log(err); 
+                setPendingDeletes((prev) => prev.filter((deleteId) => deleteId !== id)); 
+                toast.error("Gagal menghapus konten."); 
+            }); 
+    }; 
+
     useEffect(() => { 
         fetchContents(); 
-    }, []) 
- 
+    }, []); 
+
     return ( 
         <Container className="mt-4"> 
             <Stack direction="horizontal" gap={3} className="mb-3"> 
                 <h1 className="h4 fw-bold mb-0 text-nowrap text-white">My Videos</h1> 
                 <hr className="border-top border-light opacity-50 w-100" /> 
                 <div className="ms-auto text-nowrap"> 
-                    <ModalCreateContent onClose={fetchContents} /> 
+                    <ModalCreateContent 
+                        onClose={fetchContents} 
+                        show={showCreateModal} 
+                        onHide={() => setShowCreateModal(false)} 
+                    /> 
+                    <Button 
+                        variant="primary" 
+                        onClick={() => setShowCreateModal(true)} 
+                    >
+                        Tambah Video
+                    </Button>
                 </div> 
             </Stack> 
             {isLoading ? ( 
@@ -88,18 +103,27 @@ const ContentPage = () => {
                             <tr key={content.id}> 
                                 <td>{index + 1}</td> 
                                 <td> 
-                                    <img src={getThumbnail(content.thumbnail)} 
-                                        alt="Thumbnail" className="object-fit-cover" 
-                                        style={{ width: "200px", aspectRatio: "16 / 9"}} /> 
+                                    <img 
+                                        src={content.thumbnail ? getThumbnail(content.thumbnail) : "/path/to/placeholder.jpg"} 
+                                        alt="Thumbnail" 
+                                        className="object-fit-cover" 
+                                        style={{ width: "200px", aspectRatio: "16 / 9"}} 
+                                    /> 
                                 </td> 
                                 <td>{content.title}</td> 
                                 <td>{content.description}</td> 
                                 <td> 
                                     <Stack direction="horizontal" gap={2}> 
-                                        <ModalEditContent content={content} 
-                                            onClose={fetchContents} /> 
-                                        {isPending ? ( 
-                                            <Button variant="danger" disabled> 
+                                        <ModalEditContent 
+                                            content={content} 
+                                            onClose={fetchContents} 
+                                        /> 
+                                        <Button 
+                                            variant="danger" 
+                                            disabled={pendingDeletes.includes(content.id)} 
+                                            onClick={() => deleteContent(content.id)}
+                                        > 
+                                            {pendingDeletes.includes(content.id) ? ( 
                                                 <Spinner 
                                                     as="span" 
                                                     animation="grow" 
@@ -107,17 +131,11 @@ const ContentPage = () => {
                                                     role="status" 
                                                     aria-hidden="true" 
                                                 /> 
-                                                Loading... 
-                                            </Button> 
-                                        ) : ( 
-                                            <Button 
-                                                variant="danger" 
-                                                onClick={() => deleteContent(content.id)}
-                                            > 
+                                            ) : ( 
                                                 <FaTrash className="mx-1 mb-1" /> 
-                                                    Hapus 
-                                            </Button> 
-                                        )} 
+                                            )} 
+                                            Hapus 
+                                        </Button> 
                                     </Stack> 
                                 </td> 
                             </tr> 
@@ -132,5 +150,5 @@ const ContentPage = () => {
         </Container> 
     ); 
 }; 
- 
-export default ContentPage;
+
+export default ContentPage; 
